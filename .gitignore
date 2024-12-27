@@ -1,0 +1,74 @@
+.git
+
+# Ansible
+*.retry
+ansible.cfg
+*.cache
+
+# Python
+*.pyc
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Vault files
+*.vault
+*.vault.yml
+*.vault.yaml
+
+# Sensitive data
+vault-password.txt
+secret.yml
+secret.yaml
+secret.json
+
+# Logs
+*.log
+logs/
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Environment files
+.env*
+*.env.yml
+!.env.example.yml

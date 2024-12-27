@@ -1,0 +1,67 @@
+---
+- name: Setup the project with Vite, React, TypeScript, and TailwindCSS
+  hosts: local
+  vars_files:
+    - .env.yml
+
+  pre_tasks:
+    - name: Check if project directory already exists
+      ansible.builtin.stat:
+        path: '{{ project_path }}/{{ project_name }}'
+      register: project_dir
+
+    - name: Fail if project already exists
+      ansible.builtin.fail:
+        msg: 'Project directory {{ project_path }}/{{ project_name }} already exists. Please choose a different project name or remove the existing directory.'
+      when: project_dir.stat.exists
+
+  tasks:
+    - name: Create Vite project
+      ansible.builtin.command:
+        cmd: 'npm create vite@latest {{ project_name }} -- --template {{ template_type }}'
+        chdir: '{{ project_path }}'
+      changed_when: true
+
+    - name: Install dependencies
+      ansible.builtin.command:
+        cmd: npm install
+        chdir: '{{ project_path }}/{{ project_name }}'
+      register: npm_install_result
+      changed_when: npm_install_result.stderr is not regex('up to date')
+
+    - name: Remove App.css file
+      ansible.builtin.file:
+        path: '{{ project_path }}/{{ project_name }}/src/App.css'
+        state: absent
+
+    - name: Install TailwindCSS and its dependencies
+      ansible.builtin.command:
+        cmd: npm install -D tailwindcss postcss autoprefixer
+        chdir: '{{ project_path }}/{{ project_name }}'
+      register: tailwind_install_result
+      changed_when: tailwind_install_result.stderr is not regex('up to date')
+
+    - name: Initialize TailwindCSS configuration
+      ansible.builtin.command:
+        cmd: npx tailwindcss init -p
+        chdir: '{{ project_path }}/{{ project_name }}'
+      args:
+        creates: '{{ project_path }}/{{ project_name }}/tailwind.config.js'
+
+    - name: Copy TailwindCSS configuration file
+      ansible.builtin.copy:
+        src: files/tailwind.config.js
+        dest: '{{ project_path }}/{{ project_name }}/tailwind.config.js'
+        mode: '0644'
+
+    - name: Copy CSS file
+      ansible.builtin.copy:
+        src: files/index.css
+        dest: '{{ project_path }}/{{ project_name }}/src/index.css'
+        mode: '0644'
+
+    - name: Copy App.tsx file
+      ansible.builtin.copy:
+        src: files/App.tsx
+        dest: '{{ project_path }}/{{ project_name }}/src/App.tsx'
+        mode: '0644'
