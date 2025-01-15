@@ -1,0 +1,86 @@
+---
+- name: Setup Flutter project with FVM
+  hosts: local
+  vars_files:
+    - .env.yml
+
+  pre_tasks:
+    - name: Check if project directory already exists
+      ansible.builtin.stat:
+        path: '{{ project_path }}/{{ project_name }}'
+      register: project_dir
+
+    - name: Fail if project already exists
+      ansible.builtin.fail:
+        msg: 'Project directory {{ project_path }}/{{ project_name }} already exists. Please choose a different project name or remove the existing directory.'
+      when: project_dir.stat.exists
+
+    - name: Check if FVM is installed
+      ansible.builtin.command:
+        cmd: which fvm
+      register: fvm_check
+      ignore_errors: true
+      changed_when: false
+
+    - name: Fail if FVM is not installed
+      ansible.builtin.fail:
+        msg: 'FVM is not installed. Please install FVM first: https://fvm.app/docs/getting_started/installation'
+      when: fvm_check.rc != 0
+
+    - name: Check if specified Flutter version is installed
+      ansible.builtin.command:
+        cmd: 'fvm list'
+      register: fvm_list_result
+      changed_when: false
+
+    - name: Fail if specified Flutter version is not installed
+      ansible.builtin.fail:
+        msg: 'Flutter version {{ flutter_version }} is not installed. Please install it first using: fvm install {{ flutter_version }}'
+      when: flutter_version not in fvm_list_result.stdout
+
+  tasks:
+    - name: Set Flutter version as global
+      ansible.builtin.command:
+        cmd: 'fvm global {{ flutter_version }}'
+      register: fvm_global_result
+      changed_when: true
+
+    - name: Create Flutter project
+      ansible.builtin.command:
+        cmd: 'fvm flutter create {% if org_name is defined %}--org {{ org_name }}{% endif %} {{ project_name }}'
+        chdir: '{{ project_path }}'
+      register: flutter_create_result
+      changed_when: true
+
+    - name: Initialize FVM in project
+      ansible.builtin.command:
+        cmd: 'fvm use {{ flutter_version }} -f'
+        chdir: '{{ project_path }}/{{ project_name }}'
+      register: fvm_use_result
+      changed_when: true
+
+    - name: Add .fvm to .gitignore
+      ansible.builtin.lineinfile:
+        path: '{{ project_path }}/{{ project_name }}/.gitignore'
+        line: '.fvm/'
+        insertafter: EOF
+        create: yes
+        mode: '0644'
+
+    - name: Run Flutter pub get
+      ansible.builtin.command:
+        cmd: 'fvm flutter pub get'
+        chdir: '{{ project_path }}/{{ project_name }}'
+      register: pub_get_result
+      changed_when: true
+
+    - name: Display success message
+      ansible.builtin.debug:
+        msg: |
+          Flutter project setup completed successfully!
+          Project location: {{ project_path }}/{{ project_name }}
+          Flutter version: {{ flutter_version }}
+          
+          To run the project:
+          cd {{ project_path }}/{{ project_name }}
+          fvm flutter run
