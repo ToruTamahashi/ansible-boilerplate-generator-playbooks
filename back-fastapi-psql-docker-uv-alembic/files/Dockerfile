@@ -1,0 +1,23 @@
+# ローカル開発用
+FROM python:3.12 AS development
+
+# 作業ディレクトリを設定
+WORKDIR /code
+
+# uvのインストール（グローバルにインストール）
+RUN pip install --upgrade pip && pip install uv
+
+# プロジェクトファイルをコピー
+COPY . /code
+
+# uvを使用してrequirements.txtを生成
+RUN uv export -o requirements.txt --no-hashes
+
+# 依存関係をインストール
+RUN pip install -r requirements.txt
+
+# 環境変数の設定（必要に応じて）
+ENV PYTHONPATH="${PYTHONPATH}:/code/app"
+
+# アプリケーションの起動コマンド
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--reload"]

@@ -1,0 +1,23 @@
+services:
+  app:
+    build:
+      context: .
+      target: development
+    ports:
+      - '8000:8080'
+    environment:
+      - ENV=development
+    volumes:
+      - .:/code
+    depends_on:
+      - db
+  db:
+    image: postgres:17
+    ports:
+      - '5432:5432'
+    volumes:
+      - ./database/:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: "{{ db_user }}"
+      POSTGRES_PASSWORD: "{{ db_password }}"
+      POSTGRES_DB: "{{ db_name }}"

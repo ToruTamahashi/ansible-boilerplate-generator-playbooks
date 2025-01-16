@@ -1,0 +1,108 @@
+---
+- name: Setup FastAPI project with uv and Docker
+  hosts: local
+  vars_files:
+    - .env.yml
+
+  pre_tasks:
+    - name: Check if project directory already exists
+      ansible.builtin.stat:
+        path: '{{ project_path }}/{{ project_name }}'
+      register: project_dir
+
+    - name: Fail if project already exists
+      ansible.builtin.fail:
+        msg: 'Project directory {{ project_path }}/{{ project_name }} already exists. Please choose a different project name or remove the existing directory.'
+      when: project_dir.stat.exists
+
+  tasks:
+    - name: Create required directories
+      ansible.builtin.file:
+        path: '{{ item }}'
+        state: directory
+        mode: '0755'
+      with_items:
+        - '{{ project_path }}/{{ project_name }}/app'
+        - '{{ project_path }}/{{ project_name }}/app/dependencies'
+        - '{{ project_path }}/{{ project_name }}/database'
+        - '{{ project_path }}/{{ project_name }}/app/common'
+        - '{{ project_path }}/{{ project_name }}/app/common/models'
+        - '{{ project_path }}/{{ project_name }}/app/common/schemas'
+
+    - name: Copy pyproject.toml
+      ansible.builtin.template:
+        src: templates/pyproject.toml.j2
+        dest: '{{ project_path }}/{{ project_name }}/pyproject.toml'
+        mode: '0644'
+
+    - name: Initialize project with uv sync
+      ansible.builtin.command:
+        cmd: 'uv sync'
+        chdir: '{{ project_path }}/{{ project_name }}'
+      changed_when: true
+
+    - name: Install dependencies with uv
+      ansible.builtin.command:
+        cmd: 'uv add fastapi alembic psycopg2-binary pydantic-settings'
+        chdir: '{{ project_path }}/{{ project_name }}'
+      changed_when: true
+
+    - name: Install dev dependencies with uv
+      ansible.builtin.command:
+        cmd: 'uv add --dev ruff "sqlalchemy[mypy]" "uvicorn[standard]"'
+        chdir: '{{ project_path }}/{{ project_name }}'
+      changed_when: true
+
+    - name: Initialize Alembic
+      ansible.builtin.command:
+        cmd: '{{ project_path }}/{{ project_name }}/.venv/bin/alembic init migrations'
+        chdir: '{{ project_path }}/{{ project_name }}'
+      changed_when: true
+
+    - name: Replace Alembic configuration files
+      ansible.builtin.template:
+        src: 'templates/alembic/{{ item.src }}'
+        dest: '{{ project_path }}/{{ project_name }}/{{ item.dest }}'
+        mode: '0644'
+      with_items:
+        - { src: 'alembic.ini.j2', dest: 'alembic.ini' }
+        - { src: 'env.py.j2', dest: 'migrations/env.py' }
+
+    - name: Copy app files
+      ansible.builtin.copy:
+        src: '{{ item.src }}'
+        dest: '{{ project_path }}/{{ project_name }}/{{ item.dest }}'
+        mode: '0644'
+      with_items:
+        - { src: 'files/main.py', dest: 'app/main.py' }
+        - { src: 'files/config.py', dest: 'app/config.py' }
+        - { src: 'files/database.py', dest: 'app/dependencies/database.py' }
+        - { src: 'files/base.py', dest: 'app/common/models/base.py' }
+
+    - name: Create __init__.py files
+      ansible.builtin.file:
+        path: '{{ project_path }}/{{ project_name }}/{{ item }}'
+        state: touch
+        mode: '0644'
+      with_items:
+        - 'app/dependencies/__init__.py'
+        - 'app/common/__init__.py'
+        - 'app/common/models/__init__.py'
+        - 'app/common/schemas/__init__.py'
+
+    - name: Copy template files
+      ansible.builtin.template:
+        src: 'templates/{{ item.src }}'
+        dest: '{{ project_path }}/{{ project_name }}/{{ item.dest }}'
+        mode: '0644'
+      with_items:
+        - { src: 'docker-compose.yml.j2', dest: 'docker-compose.yml' }
+        - { src: 'Dockerfile.j2', dest: 'Dockerfile' }
+        - { src: '.env.j2', dest: '.env' }
+        - { src: '.env.example.j2', dest: '.env.example' }
+
+    - name: Copy .gitignore
+      ansible.builtin.copy:
+        src: files/.gitignore
+        dest: '{{ project_path }}/{{ project_name }}/.gitignore'
+        mode: '0644'
